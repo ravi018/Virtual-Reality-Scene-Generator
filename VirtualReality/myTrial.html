@@ -1,0 +1,878 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<title>three.js webgl - glTF 2.0 - extensions</title>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		<style>
+			body {
+				font-family: Monospace;
+				background-color: #222222;
+				margin: 0px;
+				overflow: hidden;
+			}
+
+			#info {
+				color: #808080;
+				position: absolute;
+				top: 10px;
+				width: 100%;
+				text-align: center;
+				z-index: 100;
+				display:block;
+			}
+
+			#container {
+				position: absolute;
+				top: 0px;
+				width:100%;
+				height:100%;
+				z-index: -1;
+			}
+
+			#info a, .button {
+				color: #f00;
+				font-weight: bold;
+				text-decoration: underline;
+				cursor: pointer
+			}
+
+		</style>
+	</head>
+
+	<body>
+		<div id="info">
+			<a href="http://threejs.org" target="_blank" rel="noopener">three.js</a> -
+			<a href="https://github.com/KhronosGroup/glTF" target="_blank" rel="noopener">glTF</a> 2.0 loader<br />
+			<div id="description"></div>
+		</div>
+
+		<div id="container"></div>
+
+		<script src="./build/three.js"></script>
+		<script src="js/dat.gui.min.js"></script>
+		<script src="js/OrbitControls.js"></script>
+		<script src="js/DRACOLoader.js"></script>
+		<script src="js/DDSLoader.js"></script>
+		<script src="js/GLTFLoader.js"></script>
+
+		<script src="js/PMREMGenerator.js"></script>
+		<script src="js/PMREMCubeUVPacker.js"></script>
+
+		<script>
+			var orbitControls;
+			var container, camera, scene, renderer, loader;
+			var gltf, background, envMap, mixer, gui, extensionControls;
+			var geoStage, weatherStage, seasonStage;
+
+			var clock = new THREE.Clock();
+
+			var scenesGeo = {
+				HILLY:{
+					name: 'Snow Scene',
+					url: 'models/Mountain.glb',
+					author: 'Ravi & Ankit',
+					authorURL: 'https://www.github.com/ravi018',
+					cameraPos: new THREE.Vector3( -1, 2, 2 ),
+					//center: new THREE.Vector3( 0, 1.2, 0 ),
+					objectScale: new THREE.Vector3( 0.1, 0.1, 0.1 ),
+					objectRotation: new THREE.Euler( 0, 30, 0 ),
+					addLights: true,
+					addGround: true,
+					shadows: false,
+					addEnvMap: true
+				},
+				'CROWDED MARKET':{
+					name: 'Market',
+					url: 'models/market.glb',
+					author: 'Ravi & Ankit',
+					authorURL: 'https://www.github.com/ravi018',
+					cameraPos: new THREE.Vector3( 0.5, 2, 2 ),
+					//center: new THREE.Vector3( 0, 1.2, 0 ),
+					objectScale: new THREE.Vector3( 0.1, 0.1, 0.1 ),
+					objectRotation: new THREE.Euler( 0, 0, 0 ),
+					addLights: true,
+					addGround: false,
+					shadows: false,
+					addEnvMap: false
+				},
+				'OPEN FIELD':{
+					name: 'Open Field',
+					url: 'models/field.glb',
+					author: 'Ravi & Ankit',
+					authorURL: 'https://www.github.com/ravi018',
+					cameraPos: new THREE.Vector3( 0.5, 2, 2 ),
+					//center: new THREE.Vector3( 0, 1.2, 0 ),
+					objectScale: new THREE.Vector3( 0.1, 0.1, 0.1 ),
+					objectRotation: new THREE.Euler( 0, 0, 0 ),
+					addLights: true,
+					addGround: true,
+					shadows: false,
+					addEnvMap: false
+				},
+				OCEAN:{
+					name: 'Ocean',
+					url: 'models/ocean.glb',
+					author: 'Ravi & Ankit',
+					authorURL: 'https://www.github.com/ravi018',
+					cameraPos: new THREE.Vector3( 0.5, 2, 2 ),
+					//center: new THREE.Vector3( 0, 1.2, 0 ),
+					objectScale: new THREE.Vector3( 0.1, 0.1, 0.1 ),
+					objectRotation: new THREE.Euler( 0, 0, 0 ),
+					addLights: true,
+					addGround: true,
+					shadows: false,
+					addEnvMap: false
+				}
+
+			};
+
+			var scenesWeather = {
+				SUNNY:{
+					name: 'Sunny',
+					url: 'models/Sun.glb',
+					author: 'Ravi & Ankit',
+					authorURL: 'https://www.github.com/ravi018',
+					cameraPos: new THREE.Vector3( 0.5, 2, 2 ),
+					//center: new THREE.Vector3( 0, 1.2, 0 ),
+					objectScale: new THREE.Vector3( 0.1, 0.1, 0.1 ),
+					objectRotation: new THREE.Euler( 0, 0, 0 ),
+					addLights: true,
+					addGround: false,
+					shadows: true,
+					addEnvMap: false
+				},
+				RAINY:{
+					name: 'Rainy',
+					url: 'models/Rain.glb',
+					author: 'Ravi & Ankit',
+					authorURL: 'https://www.github.com/ravi018',
+					cameraPos: new THREE.Vector3( 0.5, 2, 2 ),
+					//center: new THREE.Vector3( 0, 1.2, 0 ),
+					objectScale: new THREE.Vector3( 0.1, 0.1, 0.1 ),
+					objectRotation: new THREE.Euler( 0, 0, 0 ),
+					addLights: true,
+					addGround: false,
+					shadows: true,
+					addEnvMap: false
+				},
+				FOGGY:{
+					name: 'Fog',
+					url: 'models/blank.glb',
+					author: 'Ravi & Ankit',
+					authorURL: 'https://www.github.com/ravi018',
+					cameraPos: new THREE.Vector3( 0.5, 2, 2 ),
+					//center: new THREE.Vector3( 0, 1.2, 0 ),
+					objectScale: new THREE.Vector3( 0.1, 0.1, 0.1 ),
+					objectRotation: new THREE.Euler( 0, 0, 0 ),
+					addLights: true,
+					addGround: false,
+					shadows: true,
+					addEnvMap: false,
+					fog:true
+				}
+
+			};
+			
+			var scenesSeason = {
+				SUMMER:{
+					name: 'Summers',
+					url: 'models/Cloud.glb',
+					author: 'Ravi & Ankit',
+					authorURL: 'https://www.github.com/ravi018',
+					cameraPos: new THREE.Vector3( 0.5, 2, 2 ),
+					//center: new THREE.Vector3( 0, 1.2, 0 ),
+					objectScale: new THREE.Vector3( 0.1, 0.1, 0.1 ),
+					objectRotation: new THREE.Euler( 0, 0, 0 ),
+					addLights: true,
+					addGround: false,
+					shadows: true,
+					addEnvMap: false
+				},
+				WINTER:{
+					name: 'Winter',
+					url: 'models/winter.glb',//Winter.glb
+					author: 'Ravi & Ankit',
+					authorURL: 'https://www.github.com/ravi018',
+					cameraPos: new THREE.Vector3( 4, 2, 1 ),
+					//center: new THREE.Vector3( 0, 1.2, 0 ),
+					objectScale: new THREE.Vector3( 0.075, 0.075, 0.075 ),
+					objectRotation: new THREE.Euler( 0, 0, 0 ),
+					addLights: true,
+					addGround: false,
+					shadows: true,
+					addEnvMap: false
+				}
+
+			};
+
+			var stateGeo = {
+				scene: Object.keys( scenesGeo )[ 0 ],
+				playAnimation: true
+			};
+
+			var stateWeather = {
+				scene: Object.keys( scenesWeather)[ 0 ],
+				playAnimation: true
+			};
+
+			var stateSeason = {
+				scene: Object.keys( scenesSeason )[ 0 ],
+				playAnimation: true
+			};
+
+			function onload() {
+
+				container = document.getElementById( 'container' );
+
+				renderer = new THREE.WebGLRenderer( { antialias: true } );
+				renderer.setPixelRatio( window.devicePixelRatio );
+				renderer.setSize( window.innerWidth, window.innerHeight );
+				renderer.gammaOutput = true;
+				renderer.physicallyCorrectLights = true;
+				container.appendChild( renderer.domElement );
+
+				window.addEventListener( 'resize', onWindowResize, false );
+
+				buildGUI();
+				initScape(scenesGeo[ stateGeo.scene ], scenesWeather[ stateWeather.scene ], scenesSeason[ stateSeason.scene ]);
+				animate();
+
+			}
+
+			function initScape(sceneInfoGeo, sceneInfoWeather, sceneInfoSeason){
+				var descriptionEl = document.getElementById( 'description' );
+
+				if ( sceneInfoGeo.author && sceneInfoGeo.authorURL ) {
+
+					descriptionEl.innerHTML = sceneInfoGeo.name + ' by <a href="' + sceneInfoGeo.authorURL + '" target="_blank" rel="noopener">' + sceneInfoGeo.author + '</a>';
+
+				}
+
+				//Initialize Scene
+				scene = new THREE.Scene();
+				scene.background = new THREE.Color( 0x222222 );
+
+				//Initialize Camera
+				camera = new THREE.PerspectiveCamera( 45, container.offsetWidth / container.offsetHeight, 0.001, 1000 );
+				scene.add( camera );
+
+				// TODO: Reuse existing OrbitControls, GLTFLoaders, and so on
+				//Initialize Orbit Controls
+				orbitControls = new THREE.OrbitControls( camera, renderer.domElement );
+
+				//Initialize GLTF Loader
+				loader = new THREE.GLTFLoader();
+
+				THREE.DRACOLoader.setDecoderPath( 'js/gltf/' );
+				loader.setDRACOLoader( new THREE.DRACOLoader() );
+
+				initGeoScene(sceneInfoGeo);
+				initWeatherScene(sceneInfoWeather);
+				initSeasonScene(sceneInfoSeason);
+			}
+
+			function initGeoScene( sceneInfo ) {		
+
+				if(geoStage)	{
+						console.log(scene.getObjectByName("GEO"));
+						scene.remove(scene.getObjectByName("GEO"));
+						}
+
+				geoStage = new THREE.Group();
+				geoStage.name = "GEO";
+				var spot1;
+
+				if ( sceneInfo.addLights ) {
+
+					var ambient = new THREE.AmbientLight( 0x222222 );
+					geoStage.add( ambient );
+
+					var directionalLight = new THREE.DirectionalLight( 0xdddddd, 4 );
+					directionalLight.position.set( 0, 0, 1 ).normalize();
+					geoStage.add( directionalLight );
+
+					spot1 = new THREE.SpotLight( 0xffffff, 1 );
+					spot1.position.set( 5, 10, 5 );
+					spot1.angle = 0.50;
+					spot1.penumbra = 0.75;
+					spot1.intensity = 100;
+					spot1.decay = 2;
+
+					if ( sceneInfo.shadows ) {
+
+						spot1.castShadow = true;
+						spot1.shadow.bias = 0.0001;
+						spot1.shadow.mapSize.width = 2048;
+						spot1.shadow.mapSize.height = 2048;
+
+					}
+
+					geoStage.add( spot1 );
+
+				}
+
+				if ( sceneInfo.shadows ) {
+
+					renderer.shadowMap.enabled = true;
+					renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+				}
+
+				// TODO: Reuse existing OrbitControls, GLTFLoaders, and so on
+
+				if ( sceneInfo.addGround ) {
+
+					var groundMaterial = new THREE.MeshPhongMaterial( { color: 0x32CD32 } );
+					var ground = new THREE.Mesh( new THREE.PlaneBufferGeometry( 512, 512 ), groundMaterial );
+					ground.receiveShadow = !! sceneInfo.shadows;
+
+					if ( sceneInfo.groundPos ) {
+
+						ground.position.copy( sceneInfo.groundPos );
+
+					} else {
+
+						ground.position.z = - 70;
+
+					}
+
+					ground.rotation.x = - Math.PI / 2;
+
+					geoStage.add( ground );
+
+				}
+
+				var loadStartTime = performance.now();	
+
+				var url = sceneInfo.url;	
+
+				loader.load( url, function ( data ) {
+
+					gltf = data;
+
+					var object = gltf.scene;
+
+					console.info( 'Load time: ' + ( performance.now() - loadStartTime ).toFixed( 2 ) + ' ms.' );
+
+					if ( sceneInfo.cameraPos ) {
+					
+						camera.position.copy( sceneInfo.cameraPos );
+						
+
+					}
+
+					if ( sceneInfo.center ) {
+
+						orbitControls.target.copy( sceneInfo.center );
+
+					}
+
+					if ( sceneInfo.objectPosition ) {
+
+						object.position.copy( sceneInfo.objectPosition );
+
+						if ( spot1 ) {
+
+							spot1.target.position.copy( sceneInfo.objectPosition );
+
+						}
+
+					}
+
+					if ( sceneInfo.objectRotation ) {
+
+						object.rotation.copy( sceneInfo.objectRotation );
+
+					}
+
+					if ( sceneInfo.objectScale ) {
+
+						object.scale.copy( sceneInfo.objectScale );
+
+					}
+
+					if ( sceneInfo.addEnvMap ) {
+
+						object.traverse( function ( node ) {
+
+							if ( node.material && ( node.material.isMeshStandardMaterial ||
+								 ( node.material.isShaderMaterial && node.material.envMap !== undefined ) ) ) {
+
+								node.material.envMap = envMap;
+								node.material.envMapIntensity = 1.5; // boombox seems too dark otherwise
+
+							}
+
+						} );
+
+						geoStage.background = background;
+
+					}
+
+					object.traverse( function ( node ) {
+
+						if ( node.isMesh || node.isLight ) node.castShadow = true;
+
+					} );
+
+					var animations = gltf.animations;
+
+					if ( animations && animations.length ) {
+
+						mixer = new THREE.AnimationMixer( object );
+
+						for ( var i = 0; i < animations.length; i ++ ) {
+
+							var animation = animations[ i ];
+
+							// There's .3333 seconds junk at the tail of the Monster animation that
+							// keeps it from looping cleanly. Clip it at 3 seconds
+							if ( sceneInfo.animationTime ) {
+
+								animation.duration = sceneInfo.animationTime;
+
+							}
+
+							var action = mixer.clipAction( animation );
+
+							if ( state.playAnimation ) action.play();
+
+						}
+
+					}
+
+					geoStage.add( object );
+					onWindowResize();
+
+				}, undefined, function ( error ) {
+
+					console.error( error );
+
+				} 
+				);
+
+				scene.add(geoStage);
+
+			}
+
+			function initWeatherScene( sceneInfo ) {		
+
+				if(weatherStage){
+						console.log(scene.getObjectByName("WEATHER"));
+						scene.remove(scene.getObjectByName("WEATHER"));
+						}
+
+				weatherStage = new THREE.Group();
+				weatherStage.name = "WEATHER";
+				
+				var spot1;
+
+				if ( sceneInfo.addLights ) {
+
+					var ambient = new THREE.AmbientLight( 0x222222 );
+					weatherStage.add( ambient );
+
+					var directionalLight = new THREE.DirectionalLight( 0xdddddd, 4 );
+					directionalLight.position.set( 0, 0, 1 ).normalize();
+					weatherStage.add( directionalLight );
+
+					spot1 = new THREE.SpotLight( 0xffffff, 1 );
+					spot1.position.set( 5, 10, 5 );
+					spot1.angle = 0.50;
+					spot1.penumbra = 0.75;
+					spot1.intensity = 100;
+					spot1.decay = 2;
+
+					if ( sceneInfo.shadows ) {
+
+						spot1.castShadow = true;
+						spot1.shadow.bias = 0.0001;
+						spot1.shadow.mapSize.width = 2048;
+						spot1.shadow.mapSize.height = 2048;
+
+					}
+
+					weatherStage.add( spot1 );
+
+				}
+
+				if ( sceneInfo.shadows ) {
+
+					renderer.shadowMap.enabled = true;
+					renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+				}
+				
+				if( sceneInfo.fog ) {
+					scene.fog = new THREE.FogExp2( 0xefd1b5, .4 );
+				}
+				else{
+					scene.fog = new THREE.FogExp2( 0xefd1b5, 0.001 );
+				}
+
+				var loadStartTime = performance.now();		
+
+				var url = sceneInfo.url;	
+
+				loader.load( url, function ( data ) {
+
+					gltf = data;
+
+					var object = gltf.scene;
+
+					console.info( 'Load time: ' + ( performance.now() - loadStartTime ).toFixed( 2 ) + ' ms.' );
+
+					if ( sceneInfo.cameraPos ) {
+
+						camera.position.copy( sceneInfo.cameraPos );
+
+					}
+
+					if ( sceneInfo.center ) {
+
+						orbitControls.target.copy( sceneInfo.center );
+
+					}
+
+					if ( sceneInfo.objectPosition ) {
+
+						object.position.copy( sceneInfo.objectPosition );
+
+						if ( spot1 ) {
+
+							spot1.target.position.copy( sceneInfo.objectPosition );
+
+						}
+
+					}
+
+					if ( sceneInfo.objectRotation ) {
+
+						object.rotation.copy( sceneInfo.objectRotation );
+
+					}
+
+					if ( sceneInfo.objectScale ) {
+
+						object.scale.copy( sceneInfo.objectScale );
+
+					}
+
+					if ( sceneInfo.addEnvMap ) {
+
+						object.traverse( function ( node ) {
+
+							if ( node.material && ( node.material.isMeshStandardMaterial ||
+								 ( node.material.isShaderMaterial && node.material.envMap !== undefined ) ) ) {
+
+								node.material.envMap = envMap;
+								node.material.envMapIntensity = 1.5; // boombox seems too dark otherwise
+
+							}
+
+						} );
+
+						weatherStage.background = background;
+
+					}
+
+					object.traverse( function ( node ) {
+
+						if ( node.isMesh || node.isLight ) node.castShadow = true;
+
+					} );
+
+					var animations = gltf.animations;
+
+					if ( animations && animations.length ) {
+
+						mixer = new THREE.AnimationMixer( object );
+
+						for ( var i = 0; i < animations.length; i ++ ) {
+
+							var animation = animations[ i ];
+
+							// There's .3333 seconds junk at the tail of the Monster animation that
+							// keeps it from looping cleanly. Clip it at 3 seconds
+							if ( sceneInfo.animationTime ) {
+
+								animation.duration = sceneInfo.animationTime;
+
+							}
+
+							var action = mixer.clipAction( animation );
+
+							if ( state.playAnimation ) action.play();
+
+						}
+
+					}
+
+					weatherStage.add( object );
+					onWindowResize();
+
+				}, undefined, function ( error ) {
+
+					console.error( error );
+
+				} 
+				);
+
+				scene.add(weatherStage);
+
+			}
+
+
+			function initSeasonScene( sceneInfo ) {		
+
+				if(seasonStage){
+						console.log(scene.getObjectByName("SEASON"));
+						scene.remove(scene.getObjectByName("SEASON"));
+						}
+
+				seasonStage = new THREE.Group();
+				seasonStage.name = "SEASON";
+				
+				var spot1;
+
+				if ( sceneInfo.addLights ) {
+
+					var ambient = new THREE.AmbientLight( 0x222222 );
+					seasonStage.add( ambient );
+
+					var directionalLight = new THREE.DirectionalLight( 0xdddddd, 4 );
+					directionalLight.position.set( 0, 0, 1 ).normalize();
+					seasonStage.add( directionalLight );
+
+					spot1 = new THREE.SpotLight( 0xffffff, 1 );
+					spot1.position.set( 5, 10, 5 );
+					spot1.angle = 0.50;
+					spot1.penumbra = 0.75;
+					spot1.intensity = 100;
+					spot1.decay = 2;
+
+					if ( sceneInfo.shadows ) {
+
+						spot1.castShadow = true;
+						spot1.shadow.bias = 0.0001;
+						spot1.shadow.mapSize.width = 2048;
+						spot1.shadow.mapSize.height = 2048;
+
+					}
+
+					seasonStage.add( spot1 );
+
+				}
+
+				if ( sceneInfo.shadows ) {
+
+					renderer.shadowMap.enabled = true;
+					renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+				}
+
+				var loadStartTime = performance.now();		
+
+				var url = sceneInfo.url;	
+
+				loader.load( url, function ( data ) {
+
+					gltf = data;
+
+					var object = gltf.scene;
+
+					console.info( 'Load time: ' + ( performance.now() - loadStartTime ).toFixed( 2 ) + ' ms.' );
+
+					if ( sceneInfo.cameraPos ) {
+
+						camera.position = - sceneInfo.cameraPos ;
+						
+					}
+
+					if ( sceneInfo.center ) {
+
+						orbitControls.target.copy( sceneInfo.center );
+
+					}
+
+					if ( sceneInfo.objectPosition ) {
+
+						object.position.copy( sceneInfo.objectPosition );
+
+						if ( spot1 ) {
+
+							spot1.target.position.copy( sceneInfo.objectPosition );
+
+						}
+
+					}
+
+					if ( sceneInfo.objectRotation ) {
+
+						object.rotation.copy( sceneInfo.objectRotation );
+
+					}
+
+					if ( sceneInfo.objectScale ) {
+
+						object.scale.copy( sceneInfo.objectScale );
+
+					}
+
+					if ( sceneInfo.addEnvMap ) {
+
+						object.traverse( function ( node ) {
+
+							if ( node.material && ( node.material.isMeshStandardMaterial ||
+								 ( node.material.isShaderMaterial && node.material.envMap !== undefined ) ) ) {
+
+								node.material.envMap = envMap;
+								node.material.envMapIntensity = 1.5; // boombox seems too dark otherwise
+
+							}
+
+						} );
+
+						seasonStage.background = background;
+
+					}
+
+					object.traverse( function ( node ) {
+
+						if ( node.isMesh || node.isLight ) node.castShadow = true;
+
+					} );
+
+					var animations = gltf.animations;
+
+					if ( animations && animations.length ) {
+
+						mixer = new THREE.AnimationMixer( object );
+
+						for ( var i = 0; i < animations.length; i ++ ) {
+
+							var animation = animations[ i ];
+
+							// There's .3333 seconds junk at the tail of the Monster animation that
+							// keeps it from looping cleanly. Clip it at 3 seconds
+							if ( sceneInfo.animationTime ) {
+
+								animation.duration = sceneInfo.animationTime;
+
+							}
+
+							var action = mixer.clipAction( animation );
+
+							if ( state.playAnimation ) action.play();
+
+						}
+
+					}
+
+					seasonStage.add( object );
+					onWindowResize();
+
+				}, undefined, function ( error ) {
+
+					console.error( error );
+
+				} 
+				);
+
+				scene.add(seasonStage);
+
+			}
+
+
+
+
+			function onWindowResize() {
+
+				camera.aspect = container.offsetWidth / container.offsetHeight;
+				camera.updateProjectionMatrix();
+
+				renderer.setSize( window.innerWidth, window.innerHeight );
+
+			}
+
+			function animate() {
+
+				requestAnimationFrame( animate );
+
+				if ( mixer ) mixer.update( clock.getDelta() );
+
+				orbitControls.update();
+
+				render();
+
+			}
+
+			function render() {
+
+				renderer.render( scene, camera );
+
+			}
+
+			function buildGUI() {
+
+				gui = new dat.GUI( { width: 330 } );
+				gui.domElement.parentElement.style.zIndex = 101;
+
+				var landscapeCtrl = gui.add( stateGeo, 'scene', Object.keys( scenesGeo ) );
+				landscapeCtrl.onChange( reloadG );
+
+				var animCtrl = gui.add( stateGeo, 'playAnimation' );
+				animCtrl.onChange( toggleAnimations );
+
+				var weatherCtrl = gui.add( stateWeather, 'scene', Object.keys( scenesWeather ) );
+				weatherCtrl.onChange( reloadW );
+
+				var seasonCtrl = gui.add( stateSeason, 'scene', Object.keys( scenesSeason ) );
+				seasonCtrl.onChange( reloadS );
+
+			}
+
+
+			function toggleAnimations() {
+
+				for ( var i = 0; i < gltf.animations.length; i ++ ) {
+
+					var clip = gltf.animations[ i ];
+					var action = mixer.existingAction( clip );
+
+					state.playAnimation ? action.play() : action.stop();
+
+				}
+
+			}
+
+			function reloadG() {
+
+				if ( loader && mixer ) mixer.stopAllAction();
+
+				initGeoScene( scenesGeo[ stateGeo.scene ] );
+
+			}
+
+			function reloadW() {
+
+				if ( loader && mixer ) mixer.stopAllAction();
+
+				initWeatherScene( scenesWeather[ stateWeather.scene ] );
+
+			}
+
+			function reloadS() {
+
+				if ( loader && mixer ) mixer.stopAllAction();
+
+				initSeasonScene( scenesSeason[ stateSeason.scene ] );
+
+			}
+
+			onload();
+		</script>
+
+	</body>
+</html>
